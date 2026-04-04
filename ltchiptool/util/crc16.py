@@ -1,10 +1,9 @@
 # Copyright (c) Kuba Szczodrzyński 2022-06-02.
 
-from enum import Enum
 from typing import List
 
 
-class CRC16(Enum):
+class CRC16:
     # based on https://crccalc.com/ and https://reveng.sourceforge.io/crc-catalogue/16.htm
     ANSI = dict(poly=0x8005, init=0x0000, ref=False, out=0x0000)
     ARC = dict(poly=0x8005, init=0x0000, ref=True, out=0x0000)

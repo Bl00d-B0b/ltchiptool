@@ -30,7 +30,7 @@ def check_app_code_crc(data: bytes) -> Union[bool, None]:
     # b #0x40
     # ldr pc, [pc, #0x14]
     if data[0:8] == b"\x2f\x07\xb5\x94\x35\xff\x2a\x9b":
-        crc = CRC16.CMS.calc(data[0:32])
+        crc = CRC16(CRC16.CMS).calc(data[0:32])
         crc_found = betoint(data[32:34])
         if crc == crc_found:
             return True

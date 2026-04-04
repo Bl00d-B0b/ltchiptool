@@ -72,7 +72,7 @@ def cli(board: Board, input: IO[bytes], output: str, trim: bool, checksum: bool)
                 cs = crc32(part)
                 cs = cs.to_bytes(length=4, byteorder="big")
             else:
-                cs = CRC16.ARC.calc(part)
+                cs = CRC16(CRC16.ARC).calc(part)
                 cs = cs.to_bytes(length=2, byteorder="big")
             filename = f"{offset}_{name}_{cs.hex().upper()}.bin"
         info(f"Writing {filename}")

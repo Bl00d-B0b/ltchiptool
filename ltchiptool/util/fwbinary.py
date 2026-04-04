@@ -25,6 +25,7 @@ class FirmwareBinary:
     public: bool = False
 
     filename: str = None
+    is_used: bool = False
 
     def __post_init__(self) -> None:
         if isfile(self.location):
@@ -79,6 +80,7 @@ class FirmwareBinary:
         graph(indent, basename(self.filename))
 
     def write(self) -> IO[bytes]:
+        self.is_used = True
         return open(self.path, "wb")
 
     def isnewer(self, than: Union[str, "FirmwareBinary"]) -> bool:
@@ -93,6 +95,8 @@ class FirmwareBinary:
         files = []
         group = self.group_get()
         for file in group:
+            if not file.is_used:
+                continue
             if file.description is None and self.offset is not None:
                 self.description = f"For flashing directly"
             files.append(

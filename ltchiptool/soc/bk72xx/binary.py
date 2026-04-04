@@ -15,7 +15,15 @@ from ltchiptool.util.fwbinary import FirmwareBinary
 from ltchiptool.util.intbin import betoint, gen2bytes, inttobe32, pad_data
 from ltchiptool.util.obj import str2enum
 
-from .util import RBL, BekenBinary, DataType, OTACompression, OTAEncryption
+from .util import (
+    RBL,
+    BekenBinary,
+    DataType,
+    OTACompression,
+    OTAEncryption,
+    diff2ya_package,
+    diff2ya_package_info,
+)
 
 
 def to_offset(addr: int) -> int:
@@ -50,8 +58,13 @@ class BK72XXBinary(SocInterface, ABC):
         ota_compression = self.board["build.bkota.compression"]
         ota_key = self.board["build.bkota.key"]
         ota_iv = self.board["build.bkota.iv"]
-        _, ota_size, _ = self.board.region("download")
+        ota_format = self.board["build.bkota.format"]
+        ota_offs, ota_size, _ = self.board.region("download")
         version = datetime.now().strftime("%y.%m.%d")
+
+        # Fallback for LibreTiny v1.12.x and older
+        if not ota_format:
+            ota_format = "rbl-ug"
 
         nmap = toolchain.nm(input)
         app_addr = nmap["_vector_start"]
@@ -72,7 +85,7 @@ class BK72XXBinary(SocInterface, ABC):
             name=f"{mcu}_app",
             subname="ota.ug",
             ext="bin",
-            title="Cloudcutter Image",
+            title="Cloudcutter Image (UG)",
             description="UG Image for flashing with tuya-cloudcutter",
             public=True,
         )
@@ -106,6 +119,13 @@ class BK72XXBinary(SocInterface, ABC):
             offset=rbl_offs,
             ext="rblh",
             title="Beken Application RBL Header",
+        )
+        out_d2info = FirmwareBinary(
+            location=input,
+            name=f"{mcu}_app",
+            subname="diff2ya",
+            ext="dat",
+            title="Tuya T1 OTA info",
         )
         fw_bin = chext(input, "bin")
         # print graph element
@@ -156,48 +176,66 @@ class BK72XXBinary(SocInterface, ABC):
             out.write(data)
             rblh.write(data)
 
-        # write OTA package
-        rbl = RBL(
-            name="app",
-            version=f"{version}-{mcu}",
-            encryption=str2enum(OTAEncryption, ota_encryption) or OTAEncryption.NONE,
-            compression=str2enum(OTACompression, ota_compression)
-            or OTACompression.NONE,
-        )
-        out_ota.graph(1)
-        # seek back to start
-        raw.seek(0, SEEK_SET)
-        ota_gen = bk.ota_package(raw, rbl, key=ota_key, iv=ota_iv)
+        # write Beken OTA package
         ota_data = BytesIO()
-        ota = out_ota.write()
-        for data in ota_gen:
-            ota.write(data)
-            ota_data.write(data)
-        if rbl.data_size > ota_size:
-            warning(
-                f"OTA size too large: {rbl.data_size} > {ota_size} (0x{ota_size:X})"
+        if ota_format in ["rbl", "rbl-ug"]:
+            rbl = RBL(
+                name="app",
+                version=f"{version}-{mcu}",
+                encryption=str2enum(OTAEncryption, ota_encryption)
+                or OTAEncryption.NONE,
+                compression=str2enum(OTACompression, ota_compression)
+                or OTACompression.NONE,
             )
+            out_ota.graph(1)
+            # seek back to start
+            raw.seek(0, SEEK_SET)
+            ota_gen = bk.ota_package(raw, rbl, key=ota_key, iv=ota_iv)
+            with out_ota.write() as ota:
+                for data in ota_gen:
+                    ota.write(data)
+                    ota_data.write(data)
+            if rbl.data_size > ota_size:
+                warning(
+                    f"OTA size too large: {rbl.data_size} > {ota_size} (0x{ota_size:X})"
+                )
 
         # write Tuya OTA package (UG)
-        out_ug.graph(1)
-        with out_ug.write() as ug:
-            hdr = BytesIO()
-            ota_bin = ota_data.getvalue()
-            hdr.write(b"\x55\xaa\x55\xaa")
-            hdr.write(pad_data(version.encode(), 12, 0x00))
-            hdr.write(inttobe32(len(ota_bin)))
-            hdr.write(inttobe32(sum(ota_bin)))
-            ug.write(hdr.getvalue())
-            ug.write(inttobe32(sum(hdr.getvalue())))
-            ug.write(b"\xaa\x55\xaa\x55")
-            ug.write(ota_bin)
+        if ota_format == "rbl-ug":
+            out_ug.graph(1)
+            with out_ug.write() as ug:
+                hdr = BytesIO()
+                ota_bin = ota_data.getvalue()
+                hdr.write(b"\x55\xaa\x55\xaa")
+                hdr.write(pad_data(version.encode(), 12, 0x00))
+                hdr.write(inttobe32(len(ota_bin)))
+                hdr.write(inttobe32(sum(ota_bin)))
+                ug.write(hdr.getvalue())
+                ug.write(inttobe32(sum(hdr.getvalue())))
+                ug.write(b"\xaa\x55\xaa\x55")
+                ug.write(ota_bin)
+
+        # write diff2ya OTA package (UG)
+        if ota_format == "diff2ya":
+            out_ug.graph(1)
+            with out_ug.write() as ug:
+                raw.seek(0, SEEK_SET)
+                d2a_gen = diff2ya_package(raw)
+                ota_len = 0
+                for data in d2a_gen:
+                    ug.write(data)
+                    ota_len += len(data)
+                # write the diff2ya "manage info" partition
+                d2i_data = diff2ya_package_info(ota_offs, ota_len)
+                out_d2info.graph(2)
+                with out_d2info.write() as d2i:
+                    d2i.write(d2i_data)
 
         # close all files
         raw.close()
         out.close()
         crc.close()
         rblh.close()
-        ota.close()
         return out_rbl.group()
 
     def detect_file_type(

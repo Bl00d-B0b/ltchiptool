@@ -180,6 +180,10 @@ class BK72XXFlash(SocInterface, ABC):
                 ("", ""),
                 ("Encryption Key", " ".join(f"{c:08x}" for c in coeffs)),
             ]
+            if all(coeffs) and len(set(coeffs)) == 1:
+                self.info += [
+                    ("", "(likely invalid - unreadable)"),
+                ]
         return self.info
 
     def flash_get_chip_info_string(self) -> str:

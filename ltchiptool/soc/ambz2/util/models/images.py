@@ -3,7 +3,7 @@
 from dataclasses import dataclass
 from hashlib import sha256
 from hmac import HMAC
-from typing import Any, List
+from typing import Any, List, Optional
 
 from datastruct import Context, DataStruct, sizeof
 from datastruct.fields import (
@@ -65,7 +65,7 @@ class Image(DataStruct):
     )
 
     # 'header' hash for firmware images
-    ota_signature: bytes = cond(lambda ctx: ctx.is_first and ctx.is_ota)(
+    ota_signature: Optional[bytes] = cond(lambda ctx: ctx.is_first and ctx.is_ota)(
         field("32s", default=FF_32)
     )
     # keyblock for first sub-image only

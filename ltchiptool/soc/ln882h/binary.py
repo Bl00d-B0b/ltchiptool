@@ -42,8 +42,8 @@ class LN882hBinary(SocInterface, ABC):
         )
         out_ptab = FirmwareBinary(
             location=input,
-            name="part_tab",
-            offset=self.board.region("part_tab")[0],
+            name="part_table",
+            offset=self.board.region("part_table")[0],
             title="Partition Table",
         )
         out_app = FirmwareBinary(

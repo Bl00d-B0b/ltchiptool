@@ -40,13 +40,13 @@ PART_TYPE_PART_TAB     = 8
 __PART_TYPE_DICT = {
     PART_TYPE_APP          : "APP",
     PART_TYPE_OTA          : "OTA",
-    PART_TYPE_KV           : "KV",
-    PART_TYPE_NVDS         : "NVDS",
+    PART_TYPE_KV           : "LN_KV",
+    PART_TYPE_NVDS         : "LN_NVDS",
     PART_TYPE_SIMU_EEPROM  : "SIMU_EEPROM",
     PART_TYPE_USER         : "USER",
     PART_TYPE_INVALID      : "INVALID",
     PART_TYPE_BOOT         : "BOOT",
-    PART_TYPE_PART_TAB     : "PART_TAB"
+    PART_TYPE_PART_TAB     : "PART_TABLE"
 }
 
 

@@ -62,6 +62,12 @@ class LN882hBinary(SocInterface, ABC):
             description="Compressed App image for OTA flashing",
             public=True,
         )
+        out_nvds = FirmwareBinary(
+            location=input,
+            name="ln_nvds",
+            offset=self.board.region("ln_nvds")[0],
+            title="NVDS (OTA flag)",
+        )
         # print graph element
         output.graph(1)
 
@@ -107,6 +113,20 @@ class LN882hBinary(SocInterface, ABC):
         ota_tool.output_dir     = dirname(input)
         if not ota_tool.doAllWork():
             raise RuntimeError("MakeImageTool: Fail to generate OTA image")
+
+        # create a NVDS image indicating OTA download was successful
+        #  - necessary when upgrading from LibreTiny v1.12.1, as partition layouts
+        #    for several boards were changed in v1.13.0
+        #  - changing the partition layout over-the-air requires flashing 'part_table',
+        #    but applying OTA also requires a flag in `ln_nvds` to be set
+        #  - because the running version of LT uses the old layout, it sets the flag in
+        #    the wrong NVDS area
+        with out_nvds.write() as f:
+            nvds = b"NVDS[Ver 1.0]\x00" + b"\xff" * 6 + int.to_bytes(1, 4, "little")
+            nvds = nvds + b"\xff" * (0x2000 - len(nvds))
+            nvds = nvds + b"\xa5\xa5"  # indicate sector 1 is valid
+            nvds = nvds + b"\xff" * (0x3000 - len(nvds))
+            f.write(nvds)
 
         copyfile(ota_tool.output_filepath, out_ota.path)
         _, ota_size, _ = self.board.region("ota")

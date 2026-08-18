@@ -5,7 +5,8 @@ from typing import IO, Dict, Generator, List, Optional, Tuple, Union
 
 from ltchiptool import Board, Family
 from ltchiptool.models import OTAType
-from ltchiptool.util.flash import FlashConnection, FlashFeatures, FlashMemoryType
+from ltchiptool.util.flash import (FlashConnection, FlashFeatures,
+                                   FlashMemoryType)
 from ltchiptool.util.fwbinary import FirmwareBinary
 from ltchiptool.util.streams import ProgressCallback
 from uf2tool import UploadContext
@@ -28,6 +29,9 @@ class SocInterface(ABC):
         if family.is_child_of("realtek-ambz2"):
             from .ambz2 import AmebaZ2Main
             return AmebaZ2Main(family)
+        if family.is_child_of("realtek-ambd"):
+            from .ambd import AmebaDMain
+            return AmebaDMain(family)
         if family.is_child_of("lightning-ln882h"):
             from .ln882h import LN882hMain
             return LN882hMain(family)
@@ -41,6 +45,7 @@ class SocInterface(ABC):
             "beken-72xx",
             "realtek-ambz",
             "realtek-ambz2",
+            "realtek-ambd",
             "lightning-ln882h",
         ]
 

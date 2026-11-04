@@ -145,15 +145,24 @@ class AmbDTool(SerialToolBase):
     #########################################
 
     def command(self, data: bytes, ack: int = ACK[0]) -> bool:
-        """Send a command and scan the response stream for its ack byte."""
+        """Send a command and scan the response stream for its ack byte.
+
+        The flash loader sends stray NAKs between commands (bench: 5-6 of
+        them before an erase, one before each checksum reply); skip them.
+        """
         self.write(data)
-        for _ in range(5):
+        other = 0
+        for _ in range(64):
             try:
                 response = self.read(1)
             except TimeoutError:
                 return False
-            if response and response[0] == ack:
+            if response[0] == ack:
                 return True
+            if response != NAK:
+                other += 1
+                if other >= 5:
+                    return False
         return False
 
     def read_regs(self, address: int, size: int) -> Optional[bytes]:
@@ -196,6 +205,7 @@ class AmbDTool(SerialToolBase):
         callback: _T_XmodemCB = None,
     ) -> None:
         """XMODEM-write a block to RAM or flash (loader decides by address)."""
+        self.flush()
         if not self.command(struct.pack("<B", CMD_XMD)):
             raise RuntimeError("No ACK for XMODEM handshake")
         stream = BytesIO(data)
@@ -298,6 +308,7 @@ class AmbDTool(SerialToolBase):
         offset = align_down(offset, AMBD_BLOCK_SIZE)
         debug(f"Erasing {count} sectors at 0x{offset:X}")
         pkt = struct.pack("<B3s2s", CMD_EFS, inttole24(offset), inttole16(count))
+        self.flush()
         self.push_timeout(max(self.read_timeout, 0.2 * count))
         try:
             if not self.command(pkt):
